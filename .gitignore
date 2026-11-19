@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+logs/
+*.jsonl
+data/
+raw_docs/
+qdrant_storage/
+wheels/
+.env

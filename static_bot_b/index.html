@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B봇 - OOO AI 어시스턴트</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --primary: #163A64;
+    --primary-light: #1F4E86;
+    --accent: #0F6FB3;
+    --accent-soft: #4A90C4;
+    --bg: #EEF2F7;
+    --white: #ffffff;
+    --gray-100: #F4F6F9;
+    --gray-200: #E4E9F0;
+    --gray-400: #A6B3C2;
+    --gray-600: #5C6B7C;
+    --gray-800: #2B3542;
+    --bubble-user: #163A64;
+    --bubble-bot: #ffffff;
+    --shadow: 0 2px 8px rgba(22,58,100,0.08);
+  }
+  html, body { height: 100%; font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; background: var(--bg); overflow: hidden; }
+  .chat-wrap { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; background: var(--bg); }
+  .chat-header { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; padding: 14px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(22,58,100,0.3); flex-shrink: 0; font-weight: 700; }
+  .header-avatar { width: 56px; height: 36px; background:#ffffff; border-radius: 18%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; }
+  .header-info h1 { font-size: 15px; font-weight: 700; }
+  .header-info p { font-size: 11px; opacity: 0.75; margin-top: 1px; }
+  .header-status { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; opacity: 0.85; }
+  .status-dot { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .date-divider { display: flex; align-items: center; gap: 10px; padding: 16px 20px 8px; flex-shrink: 0; }
+  .date-divider::before, .date-divider::after { content:''; flex:1; height:1px; background: var(--gray-200); }
+  .date-divider span { font-size: 11px; color: var(--gray-400); padding: 0 8px; white-space: nowrap; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 8px 16px 16px; scroll-behavior: smooth; min-height: 0; }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 2px; }
+  .msg-row { display: flex; margin-bottom: 4px; animation: fadeUp 0.25s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .msg-row.user { justify-content: flex-end; }
+  .msg-row.bot { justify-content: flex-start; align-items: flex-end; gap: 8px; }
+  .bot-avatar { width: 48px; height: 32px; background: #ffffff; border-radius: 16%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 15px; color: white; margin-bottom: 2px; }
+  .bot-avatar.hidden { visibility: hidden; }
+  .msg-content { display: flex; flex-direction: column; max-width: 72%; }
+  .msg-row.user .msg-content { align-items: flex-end; }
+  .msg-row.bot .msg-content { align-items: flex-start; }
+  .bubble { padding: 10px 14px; border-radius: 18px; font-size: 14px; line-height: 1.55; word-break: break-word; }
+  .msg-row.user .bubble { background: var(--bubble-user); color: white; border-bottom-right-radius: 4px; }
+  .msg-row.bot .bubble { background: var(--bubble-bot); color: var(--gray-800); border-bottom-left-radius: 4px; box-shadow: var(--shadow); }
+  .img-preview-bubble { max-width: 200px; border-radius: 12px; margin-bottom: 4px; box-shadow: var(--shadow); }
+  .msg-time { font-size: 10px; color: var(--gray-400); margin-top: 3px; padding: 0 2px; }
+  .mode-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; padding: 2px 7px; border-radius: 8px; margin-bottom: 4px; }
+  .mode-badge.rag { background: #E8F0F8; color: var(--primary); }
+  .mode-badge.fallback { background: #f0fdf4; color: #16a34a; }
+  .sources-toggle { margin-top: 4px; background: none; border: 1px solid var(--gray-200); border-radius: 12px; padding: 4px 10px; font-size: 11px; color: var(--gray-600); cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: inherit; }
+  .sources-panel { display: none; margin-top: 4px; background: var(--gray-100); border-radius: 10px; padding: 8px 10px; font-size: 11px; color: var(--gray-600); line-height: 1.5; }
+  .sources-panel.open { display: block; }
+  .source-item { padding: 4px 0; border-bottom: 1px solid var(--gray-200); }
+  .source-item:last-child { border-bottom: none; }
+  .typing-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 4px; }
+  .typing-bubble { background: white; border-radius: 18px; border-bottom-left-radius: 4px; padding: 12px 16px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 4px; }
+  .typing-dot { width: 6px; height: 6px; background: var(--accent-soft); border-radius: 50%; animation: typing 1.2s infinite; }
+  .typing-dot:nth-child(2){animation-delay:0.2s} .typing-dot:nth-child(3){animation-delay:0.4s}
+  @keyframes typing { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-4px);opacity:1} }
+  .welcome-bubble { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; border-radius: 18px; border-bottom-left-radius: 4px; padding: 12px 16px; font-size: 14px; line-height: 1.6; font-weight: 600; }
+  .quick-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .quick-btn { background: white; border: 1px solid var(--accent); color: var(--accent); border-radius: 16px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+  .quick-btn:hover { background: var(--accent); color: white; }
+  .chat-input-area { padding: 12px 16px; background: white; border-top: 1px solid var(--gray-200); flex-shrink: 0; }
+  .image-preview-area { display: none; padding: 8px 0; }
+  .image-preview-area.show { display: flex; align-items: center; gap: 8px; }
+  .preview-img { height: 60px; border-radius: 8px; object-fit: cover; }
+  .remove-img { background: #ef4444; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+  .input-row { display: flex; align-items: flex-end; gap: 8px; }
+  .attach-btn { width: 36px; height: 36px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; transition: all 0.2s; }
+  .attach-btn:hover { background: var(--gray-200); }
+  .input-box { flex: 1; border: 1.5px solid var(--gray-200); border-radius: 20px; padding: 9px 14px; font-size: 14px; font-family: inherit; resize: none; outline: none; max-height: 100px; line-height: 1.5; transition: border-color 0.2s; overflow-y: auto; }
+  .input-box:focus { border-color: var(--accent); }
+  .input-box::placeholder { color: var(--gray-400); }
+  .send-btn { width: 40px; height: 40px; background: var(--primary); border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; box-shadow: 0 2px 8px rgba(139,69,19,0.3); }
+  .send-btn:hover { background: var(--primary-light); transform: scale(1.05); }
+  .send-btn:disabled { background: var(--gray-200); box-shadow: none; cursor: not-allowed; transform: none; }
+  .send-btn svg { width: 18px; height: 18px; fill: white; }
+</style>
+</head>
+<body>
+<div class="chat-wrap">
+  <div class="chat-header">
+    <div class="header-avatar"><img src="logo.png" alt="로고" style="width:100%;height:100%;object-fit:contain;padding:4px;"></div>
+    <div class="header-info">
+      <h1>OOO 챗봇</h1>
+      <p>OOO 플랫폼 AI 어시스턴트</p>
+    </div>
+    <div class="header-status">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">연결 중...</span>
+    </div>
+  </div>
+  <div class="date-divider"><span id="todayDate"></span></div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="msg-row bot">
+      <div class="bot-avatar"><img src="logo.png" alt="로고" style="width:100%;height:100%;object-fit:contain;padding:3px;"></div>
+      <div class="msg-content">
+        <div class="welcome-bubble">안녕하세요, <strong>OOO 챗봇</strong>입니다.<br>기업 유형, 업종, 주요 사업과 함께 현재 필요하신 지원을 자유롭게 말씀해 주세요.</div>
+        <div class="quick-btns">
+          <button class="quick-btn" onclick="sendQuick(this)">지원 신청</button>
+          <button class="quick-btn" onclick="sendQuick(this)">협력사 등록 방법</button>
+          <button class="quick-btn" onclick="sendQuick(this)">지원 프로그램 안내</button>
+          <button class="quick-btn" onclick="sendQuick(this)">담당자 연락처</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <div class="input-row">
+      <textarea class="input-box" id="inputBox" placeholder="메시지를 입력하세요..." rows="1"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+  const API_BASE = window.location.origin + '/bot_b';
+  const BOT_AVATAR = '<img src="logo.png" alt="로고" style="width:100%;height:100%;object-fit:contain;padding:3px;">';
+  const POLL_INTERVAL_MS = 600;
+  let history = [], isLoading = false;
+
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric',weekday:'long'});
+
+  async function checkHealth() {
+    try {
+      const res = await fetch(`${API_BASE}/health`);
+      const data = await res.json();
+      const ok = data.llm;
+      document.getElementById('statusDot').style.background = ok ? '#4ade80' : '#f87171';
+      document.getElementById('statusText').textContent = ok ? '정상 서비스 중' : '접속 상태 이상';
+    } catch { document.getElementById('statusDot').style.background='#f87171'; document.getElementById('statusText').textContent='접속 상태 이상'; }
+  }
+  checkHealth();
+
+  const inputBox = document.getElementById('inputBox');
+  const sendBtn = document.getElementById('sendBtn');
+  inputBox.addEventListener('input', () => {
+    inputBox.style.height = 'auto';
+    inputBox.style.height = Math.min(inputBox.scrollHeight, 100) + 'px';
+    sendBtn.disabled = inputBox.value.trim() === '' || isLoading;
+  });
+  inputBox.addEventListener('keydown', e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!sendBtn.disabled)sendMessage();} });
+  function sendQuick(btn) { inputBox.value=btn.textContent; sendMessage(); }
+  function getTime() { return new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
+  function escapeHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function formatText(t) { return escapeHtml(t).replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>'); }
+  function scrollBottom() { const el=document.getElementById('chatMessages'); el.scrollTop=el.scrollHeight; }
+  function addUserMsg(text) {
+    const row=document.createElement('div'); row.className='msg-row user';
+    row.innerHTML=`<div class="msg-content"><div class="bubble">${escapeHtml(text)}</div><span class="msg-time">${getTime()}</span></div>`;
+    document.getElementById('chatMessages').appendChild(row); scrollBottom();
+  }
+  function addStreamingBotMsg() {
+    const row=document.createElement('div'); row.className='msg-row bot';
+    row.innerHTML=`<div class="bot-avatar">${BOT_AVATAR}</div><div class="msg-content"><div class="bubble" id="streamBubble"></div></div>`;
+    document.getElementById('chatMessages').appendChild(row); scrollBottom();
+    return {bubbleEl:document.getElementById('streamBubble'),row};
+  }
+  function finalizeBotMsg(row, bubbleEl, text, sources, mode) {
+    const content=row.querySelector('.msg-content');
+    const badge=mode.includes('RAG')?`<span class="mode-badge rag">🔍 문서 기반</span>`:`<span class="mode-badge fallback">💡 일반 답변</span>`;
+    let srcHtml='';
+    if(sources&&sources.length>0){
+      const items=sources.map(s=>`<div class="source-item"><div>${escapeHtml(s.title||'문서')}</div><div>${escapeHtml(s.content)}</div></div>`).join('');
+      srcHtml=`<button class="sources-toggle" onclick="this.nextElementSibling.classList.toggle('open')">📚 참고 문서 ${sources.length}개 ▾</button><div class="sources-panel">${items}</div>`;
+    }
+    content.innerHTML=`${badge}<div class="bubble">${formatText(text)}</div>${srcHtml}<span class="msg-time">${getTime()}</span>`;
+    scrollBottom();
+  }
+  function showTyping() {
+    const row=document.createElement('div'); row.className='typing-row'; row.id='typingRow';
+    row.innerHTML=`<div class="bot-avatar">${BOT_AVATAR}</div><div class="typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+    document.getElementById('chatMessages').appendChild(row); scrollBottom();
+  }
+  function hideTyping() { const el=document.getElementById('typingRow'); if(el)el.remove(); }
+
+  function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+
+  async function sendMessage() {
+    const text=inputBox.value.trim();
+    if(!text||isLoading)return;
+    isLoading=true; sendBtn.disabled=true;
+    inputBox.value=''; inputBox.style.height='auto';
+    addUserMsg(text);
+    showTyping();
+
+    let bubbleEl=null, row=null, fullAnswer='';
+    try {
+      const startRes=await fetch(`${API_BASE}/chat/start`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history})});
+      if(!startRes.ok)throw new Error(`서버 오류: ${startRes.status}`);
+      const {job_id}=await startRes.json();
+
+      let offset=0, done=false, sources=[], mode='RAG';
+      while(!done){
+        const pollRes=await fetch(`${API_BASE}/chat/poll?job_id=${job_id}&offset=${offset}`);
+        if(!pollRes.ok)throw new Error(`폴링 오류: ${pollRes.status}`);
+        const data=await pollRes.json();
+        if(data.error)throw new Error(data.error);
+
+        if(data.tokens && data.tokens.length>0){
+          if(!bubbleEl){ hideTyping(); ({bubbleEl,row}=addStreamingBotMsg()); }
+          fullAnswer+=data.tokens.join('');
+          bubbleEl.innerHTML=formatText(fullAnswer);
+          scrollBottom();
+        }
+        offset=data.next_offset;
+        done=data.done;
+        if(done){ sources=data.sources||[]; mode=data.mode||'RAG'; }
+        if(!done) await sleep(POLL_INTERVAL_MS);
+      }
+
+      if(!bubbleEl){ hideTyping(); ({bubbleEl,row}=addStreamingBotMsg()); }
+      finalizeBotMsg(row,bubbleEl,fullAnswer,sources,mode);
+      history.push({role:'user',content:text}); history.push({role:'assistant',content:fullAnswer});
+      if(history.length>20)history=history.slice(-20);
+    }catch(err){
+      hideTyping();
+      const row=document.createElement('div'); row.className='msg-row bot';
+      row.innerHTML=`<div class="bot-avatar">${BOT_AVATAR}</div><div class="msg-content"><div class="bubble">오류: ${escapeHtml(err.message)}</div></div>`;
+      document.getElementById('chatMessages').appendChild(row); scrollBottom();
+    }
+    isLoading=false; sendBtn.disabled=inputBox.value.trim()===''; inputBox.focus();
+  }
+</script>
+</body>
+</html>
